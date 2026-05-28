@@ -1,0 +1,17 @@
+{
+  "name": "backend-project---you-tube",
+  "version": "1.0.0",
+  "description": "A Backend Project",
+  "keywords": [
+    "javascript",
+    "backend",
+    "chai"
+  ],
+  "license": "ISC",
+  "author": "sumit singh bhadoria",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
