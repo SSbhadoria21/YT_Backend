@@ -1,3 +1,4 @@
+// hum db se boht baat krenge toh hum is pure code ka ek wrapper bana lete h, or jahan use krna hoga vhan krlenge
 import mongoose from "mongoose";
 import { DB_NAME } from "../constants.js";
 
