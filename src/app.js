@@ -21,4 +21,16 @@ app.use(express.static('public'))
 //cookie parser ka kaam h ki me server se borwser ki jo cookies h unko parse use krna or unhe set krna 
 app.use(cookieParser())
 
+
+
+//routes import
+import userRouter from './routes/user.routes.js'
+
+// routes declaration
+//ye userRouter user.router.js me jo bhi kaam hoga vo yhan chalega
+app.use('/api/v1/users',userRouter)
+
+//http//:localhost:8000/api/v1/users/
+
+
 export {app}
