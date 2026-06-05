@@ -5,7 +5,7 @@ class apiError extends Error{
         stack = ""){
             super(message)
             this.stauscode = stauscode
-            this.errors = error
+            this.errors = errors
             this.data = null
             this.message = message
             this.success = false
@@ -13,7 +13,7 @@ class apiError extends Error{
             if(stack){
                 this.stack = stack
             }else{
-                errors.captureStackTrace(this, this.constructor)
+                Error.captureStackTrace(this, this.constructor)
             }
 
     }

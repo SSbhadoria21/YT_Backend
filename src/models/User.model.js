@@ -2,6 +2,9 @@ import mongoose, {Schema} from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 // Define the User schema
+
+
+
 const UserSchema = new Schema(
     {
         username : {
@@ -19,7 +22,7 @@ const UserSchema = new Schema(
             lowercase: true,
             trim: true 
         },
-        fullname: {
+        fullName: {
             type: String,
             required:true,
             trim: true,
@@ -56,11 +59,9 @@ const UserSchema = new Schema(
 // next use isliye kia h  kyoki middleware me next function call karna hota hai taaki next middleware execute ho sake
 UserSchema.pre("save",async function(next){
     // only hash the password if it has been modified (or is new)
-    if(!this.isModified("password")){
-        return next()
-    }
-    this.password = await bcrypt.hash(this.password,10)
-    next()
+     if (!this.isModified("password")) return ;
+    this.password = await bcrypt.hash(this.password, 10);
+    
 })
 UserSchema.methods.isPasswordCorrect = async function(password){
     return await bcrypt.compare(password,this.password)
@@ -71,7 +72,7 @@ UserSchema.methods.generateAccessToken = function(){
         _id : this._id,
         email: this.email,
         username: this.username,
-        fullname: this.fullname
+        fullName: this.fullName
     },
     process.env.ACCESS_TOKEN_SECRET,
     {
