@@ -31,7 +31,7 @@ const registerUser = asyncHandler(async (req,res)=>{
     //get user details from frontend
     //validation - alteast not empty
     //check if user already exists : username or email
-    //check all images, check for avatar, if avatat is there then upload it to cloudinary, or else set default avatar
+    //check all images, check for avatar, if avatar is there then upload it to cloudinary, or else set default avatar
     //create user object in db - create entry in db
     //remove password and refresh token from response
     //check for user creation, if succes then send response, or else send error response
@@ -157,7 +157,7 @@ const logoutUser = asyncHandler(async (req,res)=>{
     return res
     .status(200).clearCookie("accessToken",options).clearCookie("refreshToken",options)
     .json(
-        new Apiresponse(200,{},"user Looged out")
+        new Apiresponse(200,{},"user Logged out")
     )
 })
 
