@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { apiError } from './utils/apiError.js';
 
 const app = express()
 
@@ -45,6 +46,19 @@ app.use('/api/v1/playlist',playlistRouter)
 app.use('/api/v1/subscriptions',subscriptionRouter)
 app.use('/api/v1/dashboard',dashboardRouter)
 app.use('/api/v1/healthcheck',healthcheckRouter)
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+    let statusCode = err.statusCode || 500;
+    let message = err.message || "Internal Server Error";
+
+    res.status(statusCode).json({
+        success: false,
+        message: message,
+        errors: err.errors || [],
+        data: null
+    });
+});
 
 //http//:localhost:8000/api/v1/users/
 

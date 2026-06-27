@@ -213,7 +213,7 @@ const changeCurrentPassword = asyncHandler(async (req,res)=>{
     user.password = newPassword
     await user.save({validateBeforeSave:false})
     return res.status(200)
-    .json(Apiresponse(
+    .json(new Apiresponse(
         200,
         {},"Password Changed SuccessFully"
     ))
@@ -221,7 +221,7 @@ const changeCurrentPassword = asyncHandler(async (req,res)=>{
 
 
 const getCurrentUser = asyncHandler(async (req,res)=>{
-    return res.status(200).json(Apiresponse(
+    return res.status(200).json(new Apiresponse(
         200, req.user,"current user fetched successfully"
     ))
 })
