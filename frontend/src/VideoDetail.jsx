@@ -16,6 +16,8 @@ function VideoDetail({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showFullDesc, setShowFullDesc] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscribersCount, setSubscribersCount] = useState(0);
   const videoRef = useRef(null);
 
   // Keyboard Shortcuts Effect
@@ -29,30 +31,29 @@ function VideoDetail({ user }) {
         return;
       }
 
-      const video = videoRef.current;
-      if (!video) return;
+      const videoEl = videoRef.current;
+      if (!videoEl) return;
 
       switch (e.key.toLowerCase()) {
         case 'k':
         case ' ': 
           e.preventDefault(); 
-          if (video.paused) video.play();
-          else video.pause();
+          if (videoEl.paused) videoEl.play();
+          else videoEl.pause();
           break;
         case 'j':
-          video.currentTime -= 10;
+          videoEl.currentTime -= 10;
           break;
         case 'l':
-          video.currentTime += 10;
+          videoEl.currentTime += 10;
           break;
         case 'm':
-          video.muted = !video.muted;
+          videoEl.muted = !videoEl.muted;
           break;
         case 'f':
           if (!document.fullscreenElement) {
-            video.requestFullscreen().catch(err => console.error("Fullscreen error:", err));
+            videoEl.requestFullscreen().catch(err => console.error("Fullscreen error:", err));
           } else {
-            
             document.exitFullscreen();
           }
           break;
@@ -60,7 +61,7 @@ function VideoDetail({ user }) {
           if (document.pictureInPictureElement) {
             document.exitPictureInPicture();
           } else if (document.pictureInPictureEnabled) {
-            video.requestPictureInPicture().catch(err => console.error("PiP error:", err));
+            videoEl.requestPictureInPicture().catch(err => console.error("PiP error:", err));
           }
           break;
         default:
@@ -84,7 +85,11 @@ function VideoDetail({ user }) {
         const recRes = await axios.get(`http://localhost:8000/api/v1/videos`, { withCredentials: true });
         
         if (isMounted) {
-          setVideo(videoRes.data.data);
+          const fetchedVideo = videoRes.data.data;
+          setVideo(fetchedVideo);
+          setIsSubscribed(fetchedVideo.isSubscribed || false);
+          setSubscribersCount(fetchedVideo.subscribersCount || 0);
+
           // Filter out current video from recommendations
           let recs = recRes.data.data.docs || recRes.data.data || [];
           recs = recs.filter(v => v._id !== videoId);
@@ -101,6 +106,34 @@ function VideoDetail({ user }) {
     fetchData();
     return () => { isMounted = false; };
   }, [videoId]);
+
+  const handleSubscribe = async () => {
+    if (!user) {
+      alert("Please login to subscribe");
+      return;
+    }
+    if (video?.owner?._id === user._id) {
+      alert("You cannot subscribe to your own channel");
+      return;
+    }
+    
+    // Optimistic UI update
+    const previousSubState = isSubscribed;
+    setIsSubscribed(!isSubscribed);
+    setSubscribersCount(prev => isSubscribed ? prev - 1 : prev + 1);
+
+    try {
+      await axios.post(`http://localhost:8000/api/v1/subscriptions/c/${video.owner._id}`, {}, {
+        withCredentials: true
+      });
+    } catch (err) {
+      console.error("Subscription failed:", err);
+      // Revert if failed
+      setIsSubscribed(previousSubState);
+      setSubscribersCount(prev => previousSubState ? prev + 1 : prev - 1);
+      alert(err.response?.data?.message || "Failed to subscribe");
+    }
+  };
 
   if (loading) return <div style={{display:'flex',justifyContent:'center',marginTop:'50px'}}><span className="material-symbols-outlined" style={{animation:'spin 1s linear infinite', fontSize:'32px'}}>progress_activity</span></div>;
   if (error) return <div style={{textAlign:"center",marginTop:"50px",color:"#ff4d4d"}}><h2>{error}</h2></div>;
@@ -141,10 +174,24 @@ function VideoDetail({ user }) {
               )}
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontWeight: '500', fontSize: '16px' }}>{video.owner?.fullName || video.owner?.username || 'Unknown'}</span>
-                <span style={{ fontSize: '12px', color: '#aaaaaa' }}>1.2M subscribers</span>
+                <span style={{ fontSize: '12px', color: '#aaaaaa' }}>{formatViews(subscribersCount)} subscribers</span>
               </div>
-              <button style={{ marginLeft: '12px', backgroundColor: '#f1f1f1', color: '#0f0f0f', border: 'none', borderRadius: '18px', padding: '0 16px', height: '36px', fontWeight: '500', fontSize: '14px', cursor: 'pointer' }}>
-                Subscribe
+              <button 
+                onClick={handleSubscribe}
+                style={{ 
+                  marginLeft: '12px', 
+                  backgroundColor: isSubscribed ? '#272727' : '#f1f1f1', 
+                  color: isSubscribed ? '#f1f1f1' : '#0f0f0f', 
+                  border: 'none', 
+                  borderRadius: '18px', 
+                  padding: '0 16px', 
+                  height: '36px', 
+                  fontWeight: '500', 
+                  fontSize: '14px', 
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}>
+                {isSubscribed ? 'Subscribed' : 'Subscribe'}
               </button>
             </div>
 

@@ -209,6 +209,15 @@ const getVideoById = asyncHandler(async (req, res) => {
             }
         },
         {
+            // Join with subscriptions to get subscriber details for the video owner
+            $lookup: {
+                from: "subscriptions",
+                localField: "owner",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        },
+        {
             // Add custom fields like owner object, likes count, and whether current user liked it
             $addFields: {
                 owner: {
@@ -224,13 +233,24 @@ const getVideoById = asyncHandler(async (req, res) => {
                         then: true,
                         else: false
                     }
+                },
+                subscribersCount: {
+                    $size: "$subscribers"
+                },
+                isSubscribed: {
+                    $cond: {
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+                        then: true,
+                        else: false
+                    }
                 }
             }
         },
         {
-            // Remove the big likes array from the final response object for performance
+            // Remove the big arrays from the final response object for performance
             $project: {
-                likes: 0
+                likes: 0,
+                subscribers: 0
             }
         }
     ]);
