@@ -1,10 +1,10 @@
-import mongoose, {isValidObjectId} from "mongoose"
-import {Video} from "../models/Video.model.js"
-import {User} from "../models/User.model.js"
-import {apiError} from "../utils/apiError.js"
-import {Apiresponse} from "../utils/Apiresponse.js"
-import {asyncHandler} from "../utils/asyncHandler.js"
-import {uploadonCloudinary} from "../utils/Cloudinary.js"
+import mongoose, { isValidObjectId } from "mongoose"
+import { Video } from "../models/Video.model.js"
+import { User } from "../models/User.model.js"
+import { apiError } from "../utils/apiError.js"
+import { Apiresponse } from "../utils/Apiresponse.js"
+import { asyncHandler } from "../utils/asyncHandler.js"
+import { uploadonCloudinary } from "../utils/Cloudinary.js"
 
 // We are defining the getAllVideos controller to fetch videos based on queries
 const getAllVideos = asyncHandler(async (req, res) => {
@@ -87,7 +87,7 @@ const getAllVideos = asyncHandler(async (req, res) => {
 
     // We use mongooseAggregatePaginate on the video model and pass our pipeline
     const videoAggregate = Video.aggregate(pipeline);
-    
+
     // Define options for pagination
     const options = {
         page: parseInt(page, 10),
@@ -186,7 +186,7 @@ const getVideoById = asyncHandler(async (req, res) => {
                 from: "users",
                 localField: "owner",
                 foreignField: "_id",
-                as: "owner",
+                as: "ownerDetails",
                 pipeline: [
                     {
                         // Select only needed fields from user
@@ -221,7 +221,7 @@ const getVideoById = asyncHandler(async (req, res) => {
             // Add custom fields like owner object, likes count, and whether current user liked it
             $addFields: {
                 owner: {
-                    $first: "$owner"
+                    $first: "$ownerDetails"
                 },
                 likesCount: {
                     $size: "$likes"
@@ -260,10 +260,34 @@ const getVideoById = asyncHandler(async (req, res) => {
         throw new apiError(404, "Video not found");
     }
 
-    // Increment the views of the video by 1 since someone is fetching it
-    await Video.findByIdAndUpdate(videoId, {
-        $inc: { views: 1 }
-    });
+    // Only increment views if the user hasn't watched this video before
+    if (req.user) {
+        // Atomically check if the video is NOT in watchHistory, and if so, add it.
+        const updatedUser = await User.findOneAndUpdate(
+            { 
+                _id: req.user._id, 
+                watchHistory: { $ne: new mongoose.Types.ObjectId(videoId) } 
+            },
+            { 
+                $addToSet: { watchHistory: new mongoose.Types.ObjectId(videoId) } 
+            }
+        );
+
+        // If the user document was updated, it means they are watching for the first time
+        if (updatedUser) {
+            await Video.findByIdAndUpdate(videoId, {
+                $inc: { views: 1 }
+            });
+            // Reflect the newly added view in the immediate response
+            video[0].views = (video[0].views || 0) + 1;
+        }
+    } else {
+        // Fallback for unauthenticated users
+        await Video.findByIdAndUpdate(videoId, {
+            $inc: { views: 1 }
+        });
+        video[0].views = (video[0].views || 0) + 1;
+    }
 
     // Return the response with video data
     return res.status(200).json(new Apiresponse(200, video[0], "Video fetched successfully"));

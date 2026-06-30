@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Navigate, Link } from 'react-router-dom';
+import { timeAgo } from './utils/timeAgo';
 
 const categories = [
   "All", "Gaming", "Music", "Live", "Mixes", "Programming", "Podcasts", "News", "Recent", "Watched", "New to you", "JavaScript", "React", "Frontend Development", "Node.js", "AI", "Technology", "Comedy", "Vlogs", "Tutorials"
@@ -267,7 +268,7 @@ function Home({ user }) {
                                             </h3>
                                             <div style={{ color: "#aaaaaa", fontSize: '14px', marginTop: '4px', lineHeight: '20px' }}>
                                                 <div>{video.ownerDetails ? video.ownerDetails.username : 'Unknown Channel'}</div>
-                                                <div>{formatViews(video.views || 0)} views • 2 hours ago</div>
+                                                <div>{formatViews(video.views || 0)} views • {timeAgo(video.createdAt)}</div>
                                             </div>
                                         </div>
                                     </div>

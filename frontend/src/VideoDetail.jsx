@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import { timeAgo } from './utils/timeAgo';
 
-// Mock Comments Data
-const mockComments = [
-  { id: 1, user: 'John Doe', avatar: '', text: 'Great video! Thanks for sharing.', time: '2 hours ago', likes: 12 },
-  { id: 2, user: 'Tech Enthusiast', avatar: '', text: 'This was exactly what I was looking for. Keep it up!', time: '5 hours ago', likes: 45 },
-  { id: 3, user: 'Random User', avatar: '', text: 'Nice content.', time: '1 day ago', likes: 2 },
-];
+
 
 function VideoDetail({ user }) {
   const { videoId } = useParams();
@@ -18,6 +14,10 @@ function VideoDetail({ user }) {
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribersCount, setSubscribersCount] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
   const videoRef = useRef(null);
 
   // Keyboard Shortcuts Effect
@@ -84,11 +84,23 @@ function VideoDetail({ user }) {
         // Fetch all videos for recommendations
         const recRes = await axios.get(`http://localhost:8000/api/v1/videos`, { withCredentials: true });
         
+        // Fetch comments for this video
+        let fetchedComments = [];
+        try {
+          const commentsRes = await axios.get(`http://localhost:8000/api/v1/comments/${videoId}`, { withCredentials: true });
+          fetchedComments = commentsRes.data.data.docs || commentsRes.data.data || [];
+        } catch (commentErr) {
+          console.error("Failed to load comments:", commentErr);
+        }
+        
         if (isMounted) {
           const fetchedVideo = videoRes.data.data;
           setVideo(fetchedVideo);
           setIsSubscribed(fetchedVideo.isSubscribed || false);
           setSubscribersCount(fetchedVideo.subscribersCount || 0);
+          setIsLiked(fetchedVideo.isLiked || false);
+          setLikesCount(fetchedVideo.likesCount || 0);
+          setComments(fetchedComments);
 
           // Filter out current video from recommendations
           let recs = recRes.data.data.docs || recRes.data.data || [];
@@ -132,6 +144,65 @@ function VideoDetail({ user }) {
       setIsSubscribed(previousSubState);
       setSubscribersCount(prev => previousSubState ? prev + 1 : prev - 1);
       alert(err.response?.data?.message || "Failed to subscribe");
+    }
+  };
+
+  const handleCommentSubmit = async (e) => {
+    if (e.key === 'Enter') {
+      if (!user) {
+        alert("Please login to comment");
+        return;
+      }
+      if (!newComment.trim()) return;
+
+      try {
+        const res = await axios.post(`http://localhost:8000/api/v1/comments/${videoId}`, {
+          content: newComment
+        }, {
+          withCredentials: true
+        });
+
+        // Optimistically add the new comment to the list
+        // Add ownerDetails manually since the API response for adding a comment doesn't populate it immediately
+        const addedComment = {
+          ...res.data.data,
+          ownerDetails: {
+            username: user.username,
+            fullName: user.fullName,
+            avatar: user.avatar
+          }
+        };
+
+        setComments(prev => [addedComment, ...prev]);
+        setNewComment(""); // Clear input
+      } catch (err) {
+        console.error("Failed to add comment:", err);
+        alert(err.response?.data?.message || "Failed to add comment");
+      }
+    }
+  };
+
+  const handleLikeToggle = async () => {
+    if (!user) {
+      alert("Please login to like this video");
+      return;
+    }
+
+    // Optimistic UI update
+    const previousLikeState = isLiked;
+    setIsLiked(!isLiked);
+    setLikesCount(prev => isLiked ? prev - 1 : prev + 1);
+
+    try {
+      await axios.post(`http://localhost:8000/api/v1/likes/toggle/v/${videoId}`, {}, {
+        withCredentials: true
+      });
+    } catch (err) {
+      console.error("Like toggle failed:", err);
+      // Revert if failed
+      setIsLiked(previousLikeState);
+      setLikesCount(prev => previousLikeState ? prev + 1 : prev - 1);
+      alert(err.response?.data?.message || "Failed to like video");
     }
   };
 
@@ -198,9 +269,9 @@ function VideoDetail({ user }) {
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: '8px' }}>
               <div style={{ display: 'flex', backgroundColor: '#272727', borderRadius: '18px', overflow: 'hidden' }}>
-                <button style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', color: '#f1f1f1', padding: '0 16px', height: '36px', cursor: 'pointer', borderRight: '1px solid #3f3f3f' }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>thumb_up</span>
-                  <span style={{ fontSize: '14px', fontWeight: '500' }}>{formatViews(video.likesCount || 0)}</span>
+                <button onClick={handleLikeToggle} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'transparent', border: 'none', color: '#f1f1f1', padding: '0 16px', height: '36px', cursor: 'pointer', borderRight: '1px solid #3f3f3f' }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: '20px', fontVariationSettings: isLiked ? "'FILL' 1" : "'FILL' 0" }}>thumb_up</span>
+                  <span style={{ fontSize: '14px', fontWeight: '500' }}>{formatViews(likesCount)}</span>
                 </button>
                 <button style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', color: '#f1f1f1', padding: '0 16px', height: '36px', cursor: 'pointer' }}>
                   <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>thumb_down</span>
@@ -227,7 +298,7 @@ function VideoDetail({ user }) {
             onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#272727'}
           >
             <div style={{ fontWeight: '500', fontSize: '14px', marginBottom: '4px' }}>
-              {formatViews(video.views || 0)} views • {new Date(video.createdAt).toLocaleDateString()}
+              {formatViews(video.views || 0)} views • {timeAgo(video.createdAt)}
             </div>
             <div style={{ fontSize: '14px', whiteSpace: 'pre-wrap', lineHeight: '20px', display: showFullDesc ? 'block' : '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               {video.description || "No description provided."}
@@ -240,7 +311,7 @@ function VideoDetail({ user }) {
           {/* Comments Section */}
           <div style={{ marginTop: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '32px', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '700' }}>3 Comments</h2>
+              <h2 style={{ fontSize: '20px', fontWeight: '700' }}>{comments.length} Comments</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>sort</span>
                 <span style={{ fontSize: '14px', fontWeight: '500' }}>Sort by</span>
@@ -257,35 +328,51 @@ function VideoDetail({ user }) {
                 </div>
               )}
               <div style={{ flex: 1 }}>
-                <input type="text" placeholder="Add a comment..." style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid #717171', color: '#f1f1f1', paddingBottom: '4px', fontSize: '14px', outline: 'none' }} />
+                <input 
+                  type="text" 
+                  placeholder="Add a comment... (Press Enter to submit)" 
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyDown={handleCommentSubmit}
+                  style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid #717171', color: '#f1f1f1', paddingBottom: '4px', fontSize: '14px', outline: 'none' }} 
+                />
               </div>
             </div>
 
             {/* Comment List */}
-            {mockComments.map(comment => (
-              <div key={comment.id} style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#444', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}>
-                  {comment.user.charAt(0)}
-                </div>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: '500', fontSize: '13px' }}>@{comment.user.replace(' ', '').toLowerCase()}</span>
-                    <span style={{ fontSize: '12px', color: '#aaaaaa' }}>{comment.time}</span>
-                  </div>
-                  <div style={{ fontSize: '14px', marginBottom: '8px' }}>{comment.text}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>thumb_up</span>
-                      <span style={{ fontSize: '12px', color: '#aaaaaa' }}>{comment.likes}</span>
+            {comments.map(comment => {
+              const commenterName = comment.ownerDetails?.fullName || comment.ownerDetails?.username || 'User';
+              const commenterUsername = comment.ownerDetails?.username || 'user';
+              
+              return (
+                <div key={comment._id} style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                  {comment.ownerDetails?.avatar ? (
+                    <img src={comment.ownerDetails.avatar} alt="avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '40px', height: '40px', minWidth: '40px', borderRadius: '50%', background: '#444', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold' }}>
+                      {commenterName.charAt(0).toUpperCase()}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                      <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>thumb_down</span>
+                  )}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: '500', fontSize: '13px' }}>@{commenterUsername.toLowerCase()}</span>
+                      <span style={{ fontSize: '12px', color: '#aaaaaa' }}>{timeAgo(comment.createdAt)}</span>
                     </div>
-                    <span style={{ fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>Reply</span>
+                    <div style={{ fontSize: '14px', marginBottom: '8px', whiteSpace: 'pre-wrap' }}>{comment.content}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>thumb_up</span>
+                        <span style={{ fontSize: '12px', color: '#aaaaaa' }}>0</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                        <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>thumb_down</span>
+                      </div>
+                      <span style={{ fontSize: '12px', fontWeight: '500', cursor: 'pointer' }}>Reply</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
         </div>
@@ -306,7 +393,7 @@ function VideoDetail({ user }) {
                 </h3>
                 <div style={{ fontSize: '12px', color: '#aaaaaa', marginTop: '4px', lineHeight: '18px' }}>
                   <div>{recVideo.ownerDetails?.username || 'Unknown Channel'}</div>
-                  <div>{formatViews(recVideo.views || 0)} views • 1 day ago</div>
+                  <div>{formatViews(recVideo.views || 0)} views • {timeAgo(recVideo.createdAt)}</div>
                 </div>
               </div>
             </Link>
